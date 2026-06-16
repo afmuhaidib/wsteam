@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 @MainActor
 final class AppStore: ObservableObject {
@@ -14,9 +13,9 @@ final class AppStore: ObservableObject {
     private var daemonProcess: Process?
 
     enum AppState {
-        case launching          // first seconds — starting daemon
-        case needsSetup         // wine/steam not installed
-        case ready              // everything installed, show library
+        case launching
+        case needsSetup
+        case ready
     }
 
     enum SetupProgress {
@@ -30,14 +29,36 @@ final class AppStore: ObservableObject {
         Task { await boot() }
     }
 
-    // MARK: - Boot sequence
+    // MARK: - Boot
 
-    private func boot() async {
+    func boot() async {
         appState = .launching
-        startDaemonProcess()
-        // Give daemon time to start
-        try? await Task.sleep(nanoseconds: 1_800_000_000)
-        await refreshStatus()
+        killStaleDaemon()
+        guard let daemonURL = findDaemon() else {
+            // Daemon not bundled — show a friendly one-time setup message
+            appState = .needsSetup
+            setupProgress = .failed(
+                "wsteamd binary not found next to the app.\n" +
+                "Run once in Terminal:\n\n  make install\n\nThen reopen the app."
+            )
+            return
+        }
+
+        startDaemon(at: daemonURL)
+        // Poll until daemon responds (max 5 s)
+        for _ in 0..<10 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if let s = try? await client.getStatus() {
+                status = s
+                break
+            }
+        }
+
+        if status == nil {
+            appState = .needsSetup
+            setupProgress = .failed("Daemon started but isn't responding. Try quitting and reopening the app.")
+            return
+        }
 
         if let s = status, s.wineInstalled && s.steamInstalled {
             appState = .ready
@@ -47,52 +68,54 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func startDaemonProcess() {
-        // Kill stale daemon first
-        let kill = Process()
-        kill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        kill.arguments = ["-x", "wsteamd"]
-        try? kill.run()
-
-        let candidates = [
-            Bundle.main.bundlePath + "/Contents/MacOS/wsteamd",
-            "/usr/local/bin/wsteamd",
-            FileManager.default.currentDirectoryPath + "/target/release/wsteamd",
-        ]
-
-        guard let path = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            errorMessage = "wsteamd not found. Run `make install` once from Terminal."
-            return
+    private func findDaemon() -> URL? {
+        // 1. Same directory as this executable (inside the .app bundle)
+        if let exe = Bundle.main.executableURL {
+            let bundled = exe.deletingLastPathComponent().appendingPathComponent("wsteamd")
+            if FileManager.default.fileExists(atPath: bundled.path) { return bundled }
         }
+        // 2. Installed via `make install`
+        let installed = URL(fileURLWithPath: "/usr/local/bin/wsteamd")
+        if FileManager.default.fileExists(atPath: installed.path) { return installed }
 
+        // 3. Dev: built in the project's target/release
+        let devPath = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Desktop/wsteam/target/release/wsteamd")
+        if FileManager.default.fileExists(atPath: devPath.path) { return devPath }
+
+        return nil
+    }
+
+    private func killStaleDaemon() {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: path)
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        p.arguments = ["-x", "wsteamd"]
+        try? p.run(); p.waitUntilExit()
+    }
+
+    private func startDaemon(at url: URL) {
+        let p = Process()
+        p.executableURL = url
         p.standardOutput = FileHandle.nullDevice
         p.standardError  = FileHandle.nullDevice
         try? p.run()
         daemonProcess = p
     }
 
-    // MARK: - Status
-
-    func refreshStatus() async {
-        status = try? await client.getStatus()
-    }
-
     // MARK: - Setup
 
     func runFullSetup() async {
         isLoading = true
-        setupProgress = .running(step: "Downloading Wine Crossover...", pct: 5)
+        setupProgress = .running(step: "Downloading Wine Crossover…", pct: 5)
         do {
             try await client.setupWine()
-            setupProgress = .running(step: "Creating Windows prefix...", pct: 38)
+            setupProgress = .running(step: "Creating Windows prefix…", pct: 38)
             try await client.setupSteam()
-            setupProgress = .running(step: "Installing DXVK + MoltenVK...", pct: 78)
+            setupProgress = .running(step: "Installing DXVK + MoltenVK…", pct: 78)
             try await client.setupDxvk()
             setupProgress = .done
-            await refreshStatus()
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            status = try? await client.getStatus()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             appState = .ready
             await refreshLibrary()
         } catch {
@@ -105,6 +128,10 @@ final class AppStore: ObservableObject {
 
     func refreshLibrary() async {
         games = (try? await client.scanLibrary()) ?? []
+    }
+
+    func refreshStatus() async {
+        status = try? await client.getStatus()
     }
 
     // MARK: - Game actions
@@ -123,10 +150,7 @@ final class AppStore: ObservableObject {
         isLoading = false
     }
 
-    func killWineserver() async {
-        try? await client.killWineserver()
-    }
-
+    func killWineserver() async { try? await client.killWineserver() }
     func clearError() { errorMessage = nil }
 
     // MARK: - Folder access
@@ -135,7 +159,7 @@ final class AppStore: ObservableObject {
         do {
             let f = try await client.getGameFolder(game.appId)
             if f.exists { try await client.openInFinder(path: f.path) }
-            else { errorMessage = "Folder not found. Install the game in Steam first.\n\(f.path)" }
+            else { errorMessage = "Install the game in Steam first.\n\(f.path)" }
         } catch { errorMessage = error.localizedDescription }
     }
 

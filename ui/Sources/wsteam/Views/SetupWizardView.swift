@@ -34,7 +34,7 @@ struct SetupWizardView: View {
                 VStack(spacing: 12) {
                     Label("Failed", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
                     Text(msg).foregroundStyle(.red).multilineTextAlignment(.center)
-                    Button("Try Again") { store.setupProgress = .idle }
+                    Button("Try Again") { Task { await store.boot() } }
                         .buttonStyle(.borderedProminent)
                 }
             }
