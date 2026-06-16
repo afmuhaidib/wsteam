@@ -188,30 +188,39 @@ final class WineEngine: ObservableObject {
 
     // MARK: Launch Steam
 
+    // Steam black screen fix:
+    // -no-browser      disables Chromium/CEF UI (main cause of black screen)
+    // -nofriendsui     disables friends overlay renderer
+    // -noreactlogin    uses old login dialog instead of web-based one
+    // WINEDLLOVERRIDES disables Steam's broken CEF GPU process
+    private func steamEnv() -> [String: String] {
+        var env = baseEnv()
+        env["DXVK_ASYNC"] = "1"
+        env["STEAM_FRAME_FORCE_CLOSE"] = "1"
+        env["WINEDLLOVERRIDES"] = "d3d11=n,b;d3d10core=n,b;dxgi=n,b"
+        return env
+    }
+
+    private let steamExePath = #"C:\Program Files (x86)\Steam\Steam.exe"#
+    private let steamBlackScreenArgs = ["-no-browser", "-nofriendsui", "-noreactlogin", "-skipinitialbootstrap"]
+
     func launchSteam() {
         guard wineInstalled else { setError("Wine not installed"); return }
-        var env = baseEnv(); env["DXVK_ASYNC"] = "1"
-        let steamPath: String
-        if steamInstalled {
-            steamPath = #"C:\Program Files (x86)\Steam\Steam.exe"#
-        } else {
-            setError("Steam not installed — run setup first"); return
-        }
-        info("Launching Steam...")
-        let p = Process()
-        p.executableURL = WsteamPaths.wineBin
-        p.arguments = [steamPath]
-        p.environment = env
-        try? p.run()
+        guard steamInstalled else { setError("Steam not installed — run setup first"); return }
+        info("Launching Steam (black screen fix enabled)...")
+        spawnWine([steamExePath] + steamBlackScreenArgs, env: steamEnv())
     }
 
     func launchGame(appId: Int) {
         guard wineInstalled && steamInstalled else { setError("Setup incomplete"); return }
         info("Launching app \(appId)...")
-        var env = baseEnv(); env["DXVK_ASYNC"] = "1"
+        spawnWine([steamExePath, "-applaunch", "\(appId)"] + steamBlackScreenArgs, env: steamEnv())
+    }
+
+    private func spawnWine(_ args: [String], env: [String: String]) {
         let p = Process()
         p.executableURL = WsteamPaths.wineBin
-        p.arguments = [#"C:\Program Files (x86)\Steam\Steam.exe"#, "-applaunch", "\(appId)"]
+        p.arguments = args
         p.environment = env
         try? p.run()
     }
