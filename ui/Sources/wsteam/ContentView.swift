@@ -1,22 +1,13 @@
 import SwiftUI
 
-struct ContentView: View {
+struct MainAppView: View {
     @EnvironmentObject var store: AppStore
 
     var body: some View {
         NavigationSplitView {
-            SidebarView()
+            Sidebar()
         } detail: {
-            if !store.daemonRunning {
-                DaemonOfflineView()
-            } else if store.status == nil {
-                ProgressView("Connecting...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !(store.status?.wineInstalled ?? false) {
-                SetupWizardView()
-            } else {
-                LibraryView()
-            }
+            LibraryView()
         }
         .alert("Error", isPresented: .init(
             get: { store.errorMessage != nil },
@@ -26,105 +17,51 @@ struct ContentView: View {
         } message: {
             Text(store.errorMessage ?? "")
         }
-        .task {
-            await store.checkDaemon()
-        }
     }
 }
 
-struct SidebarView: View {
+struct Sidebar: View {
     @EnvironmentObject var store: AppStore
 
     var body: some View {
         List {
-            Section("wsteam") {
-                NavigationLink {
-                    LibraryView()
-                } label: {
-                    Label("Library", systemImage: "gamecontroller")
-                }
-
-                NavigationLink {
-                    StatusView()
-                } label: {
-                    Label("Status", systemImage: "info.circle")
-                }
-
-                NavigationLink {
-                    SetupWizardView()
-                } label: {
-                    Label("Setup", systemImage: "gearshape")
-                }
+            Section("Library") {
+                Label("Games", systemImage: "gamecontroller").bold()
             }
 
-            Section("Actions") {
-                Button {
-                    Task { await store.launchSteam() }
-                } label: {
-                    Label("Launch Steam", systemImage: "play.fill")
-                }
-                .buttonStyle(.plain)
+            Section("Steam") {
+                Button { Task { await store.launchSteam() } } label: {
+                    Label("Open Steam", systemImage: "play.fill")
+                }.buttonStyle(.plain)
 
-                Button {
-                    Task { await store.refreshLibrary() }
-                } label: {
-                    Label("Refresh Library", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    Task { await store.killWineserver() }
-                } label: {
-                    Label("Kill Wineserver", systemImage: "xmark.octagon")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red)
+                Button { Task { await store.refreshLibrary() } } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }.buttonStyle(.plain)
             }
 
             Section("Folders") {
-                Button {
-                    Task { await store.openSteamFolder() }
-                } label: {
-                    Label("steamapps/common", systemImage: "folder.badge.gearshape")
-                }
-                .buttonStyle(.plain)
-                .help("Open the folder where games are installed — drop mods here")
+                Button { Task { await store.openSteamFolder() } } label: {
+                    Label("Games / Mods", systemImage: "folder.badge.gearshape")
+                }.buttonStyle(.plain).help("steamapps/common — drop mods here")
 
-                Button {
-                    Task { await store.openPrefixFolder() }
-                } label: {
-                    Label("Wine Prefix (C:\\)", systemImage: "internaldrive")
+                Button { Task { await store.openPrefixFolder() } } label: {
+                    Label("Wine C:\\", systemImage: "internaldrive")
+                }.buttonStyle(.plain).help("Full Windows drive_c")
+            }
+
+            Section("System") {
+                NavigationLink { SetupWizardView() } label: {
+                    Label("Setup", systemImage: "gearshape")
                 }
-                .buttonStyle(.plain)
-                .help("Open the full Windows drive_c in Finder")
+                NavigationLink { StatusView() } label: {
+                    Label("Status", systemImage: "info.circle")
+                }
+                Button { Task { await store.killWineserver() } } label: {
+                    Label("Kill Wineserver", systemImage: "xmark.octagon")
+                }.buttonStyle(.plain).foregroundStyle(.red)
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 180, ideal: 210)
-    }
-}
-
-struct DaemonOfflineView: View {
-    @EnvironmentObject var store: AppStore
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 64))
-                .foregroundStyle(.orange)
-
-            Text("Daemon not running")
-                .font(.title2.bold())
-
-            Text("Start the daemon to continue.")
-                .foregroundStyle(.secondary)
-
-            Button("Start Daemon") {
-                store.startDaemon()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 200)
     }
 }
