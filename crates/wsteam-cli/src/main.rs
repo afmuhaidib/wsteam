@@ -39,6 +39,15 @@ enum Cmd {
     Kill,
     /// Start the wsteam daemon
     Daemon,
+    /// Open a game's install folder in Finder
+    Folder {
+        #[arg(help = "Steam App ID (0 = steamapps/common)")]
+        app_id: u64,
+    },
+    /// Open the Wine prefix (drive_c) in Finder
+    Prefix,
+    /// Open steamapps/common in Finder
+    Steamapps,
 }
 
 #[tokio::main]
@@ -127,6 +136,21 @@ async fn main() -> Result<()> {
             let resp = send_command(Command::KillWineserver).await?;
             handle_simple_response(resp);
         }
+
+        Cmd::Folder { app_id } => {
+            let resp = send_command(Command::GetGameFolder { app_id }).await?;
+            handle_folder_response(resp, true);
+        }
+
+        Cmd::Prefix => {
+            let resp = send_command(Command::GetPrefixFolder).await?;
+            handle_folder_response(resp, true);
+        }
+
+        Cmd::Steamapps => {
+            let resp = send_command(Command::GetSteamFolder).await?;
+            handle_folder_response(resp, true);
+        }
     }
 
     Ok(())
@@ -156,6 +180,25 @@ async fn send_command(cmd: Command) -> Result<Response> {
 
 fn tick(v: bool) -> &'static str {
     if v { "✓" } else { "✗" }
+}
+
+fn handle_folder_response(resp: Response, open: bool) {
+    match resp {
+        Response::Folder(info) => {
+            println!("{}", info.path.display());
+            if !info.exists {
+                eprintln!("Warning: folder does not exist yet (install the game first)");
+            }
+            if open {
+                std::process::Command::new("open")
+                    .arg(&info.path)
+                    .spawn()
+                    .ok();
+            }
+        }
+        Response::Error { message } => eprintln!("Error: {}", message),
+        _ => {}
+    }
 }
 
 fn handle_simple_response(resp: Response) {

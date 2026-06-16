@@ -117,6 +117,10 @@ enum WCommand: Encodable {
     case launchGame(appId: UInt64)
     case scanLibrary
     case killWineserver
+    case getGameFolder(appId: UInt64)
+    case getPrefixFolder
+    case getSteamFolder
+    case openInFinder(path: String)
 
     enum CodingKeys: String, CodingKey { case cmd, data }
 
@@ -135,10 +139,21 @@ enum WCommand: Encodable {
             try d.encode(id, forKey: .appId)
         case .scanLibrary:    try c.encode("ScanLibrary", forKey: .cmd)
         case .killWineserver: try c.encode("KillWineserver", forKey: .cmd)
+        case .getGameFolder(let id):
+            try c.encode("GetGameFolder", forKey: .cmd)
+            var d = c.nestedContainer(keyedBy: GameDataKeys.self, forKey: .data)
+            try d.encode(id, forKey: .appId)
+        case .getPrefixFolder:  try c.encode("GetPrefixFolder", forKey: .cmd)
+        case .getSteamFolder:   try c.encode("GetSteamFolder", forKey: .cmd)
+        case .openInFinder(let path):
+            try c.encode("OpenFolderInFinder", forKey: .cmd)
+            var d = c.nestedContainer(keyedBy: PathKeys.self, forKey: .data)
+            try d.encode(path, forKey: .path)
         }
     }
 
     private enum GameDataKeys: String, CodingKey { case appId = "app_id" }
+    private enum PathKeys: String, CodingKey { case path }
 }
 
 enum WResponse: Decodable {
@@ -148,6 +163,7 @@ enum WResponse: Decodable {
     case config(String)
     case error(String)
     case progress(step: String, pct: Int)
+    case folder(FolderPayload)
 
     enum CodingKeys: String, CodingKey { case type, data }
 
@@ -161,11 +177,20 @@ enum WResponse: Decodable {
         case "Error":
             let d = try c.decode(ErrorData.self, forKey: .data)
             self = .error(d.message)
+        case "Folder":
+            self = .folder(try c.decode(FolderPayload.self, forKey: .data))
         default:         self = .ok
         }
     }
 
     private struct ErrorData: Decodable { let message: String }
+}
+
+extension WResponse {
+    var folderPayload: FolderPayload? {
+        if case .folder(let f) = self { return f }
+        return nil
+    }
 }
 
 struct StatusPayload: Decodable {
@@ -216,5 +241,36 @@ enum WsteamError: LocalizedError {
         case .unexpectedResponse:  return "Unexpected response from daemon"
         case .remote(let msg):     return msg
         }
+    }
+}
+
+struct FolderPayload: Decodable {
+    let path: String
+    let exists: Bool
+    let label: String
+}
+
+// MARK: - DaemonClient folder helpers
+extension DaemonClient {
+    func getGameFolder(_ appId: UInt64) async throws -> FolderPayload {
+        let resp = try await sendCommand(.getGameFolder(appId: appId))
+        guard let f = resp.folderPayload else { throw WsteamError.unexpectedResponse }
+        return f
+    }
+
+    func getPrefixFolder() async throws -> FolderPayload {
+        let resp = try await sendCommand(.getPrefixFolder)
+        guard let f = resp.folderPayload else { throw WsteamError.unexpectedResponse }
+        return f
+    }
+
+    func getSteamFolder() async throws -> FolderPayload {
+        let resp = try await sendCommand(.getSteamFolder)
+        guard let f = resp.folderPayload else { throw WsteamError.unexpectedResponse }
+        return f
+    }
+
+    func openInFinder(path: String) async throws {
+        _ = try await sendCommand(.openInFinder(path: path))
     }
 }

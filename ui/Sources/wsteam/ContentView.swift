@@ -80,9 +80,27 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
             }
+
+            Section("Folders") {
+                Button {
+                    Task { await store.openSteamFolder() }
+                } label: {
+                    Label("steamapps/common", systemImage: "folder.badge.gearshape")
+                }
+                .buttonStyle(.plain)
+                .help("Open the folder where games are installed — drop mods here")
+
+                Button {
+                    Task { await store.openPrefixFolder() }
+                } label: {
+                    Label("Wine Prefix (C:\\)", systemImage: "internaldrive")
+                }
+                .buttonStyle(.plain)
+                .help("Open the full Windows drive_c in Finder")
+            }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 210)
     }
 }
 

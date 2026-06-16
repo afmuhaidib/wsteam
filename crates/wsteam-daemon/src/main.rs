@@ -263,5 +263,64 @@ async fn dispatch(cmd: Command, shared: SharedConfig) -> Response {
             info!("Daemon shutting down");
             std::process::exit(0);
         }
+
+        Command::GetGameFolder { app_id } => {
+            let cfg = shared.lock().await.clone();
+            let launcher = Launcher::new(cfg.clone());
+            let games = launcher.scan_library();
+            if let Some(game) = games.iter().find(|g| g.app_id == app_id) {
+                Response::Folder(wsteam_core::ipc::FolderInfo {
+                    path: game.install_dir.clone(),
+                    exists: game.install_dir.exists(),
+                    label: format!("{} ({})", game.name, app_id),
+                })
+            } else {
+                // Return steamapps/common even if game not found by scanner
+                let common = cfg.steam.prefix_dir
+                    .join("drive_c")
+                    .join("Program Files (x86)")
+                    .join("Steam")
+                    .join("steamapps")
+                    .join("common");
+                Response::Folder(wsteam_core::ipc::FolderInfo {
+                    exists: common.exists(),
+                    label: format!("steamapps/common (game {} not found in scanner)", app_id),
+                    path: common,
+                })
+            }
+        }
+
+        Command::GetPrefixFolder => {
+            let cfg = shared.lock().await.clone();
+            let drive_c = cfg.steam.prefix_dir.join("drive_c");
+            Response::Folder(wsteam_core::ipc::FolderInfo {
+                exists: drive_c.exists(),
+                label: "Wine prefix (drive_c)".into(),
+                path: drive_c,
+            })
+        }
+
+        Command::GetSteamFolder => {
+            let cfg = shared.lock().await.clone();
+            let steamapps = cfg.steam.prefix_dir
+                .join("drive_c")
+                .join("Program Files (x86)")
+                .join("Steam")
+                .join("steamapps")
+                .join("common");
+            Response::Folder(wsteam_core::ipc::FolderInfo {
+                exists: steamapps.exists(),
+                label: "steamapps/common".into(),
+                path: steamapps,
+            })
+        }
+
+        Command::OpenFolderInFinder { path } => {
+            std::process::Command::new("open")
+                .arg(&path)
+                .spawn()
+                .ok();
+            Response::Ok
+        }
     }
 }

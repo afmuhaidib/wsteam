@@ -33,7 +33,6 @@ final class AppStore: ObservableObject {
         guard !daemonRunning else { return }
         let daemonPath = Bundle.main.bundlePath
             .appending("/Contents/MacOS/wsteamd")
-
         let altPath = "/usr/local/bin/wsteamd"
         let path = FileManager.default.fileExists(atPath: daemonPath)
             ? daemonPath : altPath
@@ -43,7 +42,6 @@ final class AppStore: ObservableObject {
         process.launch()
         daemonProcess = process
 
-        // Poll until connected
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             await checkDaemon()
@@ -65,7 +63,7 @@ final class AppStore: ObservableObject {
         do {
             setupProgress = .running(step: "Installing Wine...", pct: 10)
             try await client.setupWine()
-            setupProgress = .running(step: "Creating Wine prefix...", pct: 40)
+            setupProgress = .running(step: "Installing Steam...", pct: 40)
             try await client.setupSteam()
             setupProgress = .running(step: "Installing DXVK + MoltenVK...", pct: 80)
             try await client.setupDxvk()
@@ -83,7 +81,7 @@ final class AppStore: ObservableObject {
         do {
             games = try await client.scanLibrary()
         } catch {
-            // Non-fatal: games just stay empty
+            // Non-fatal
         }
     }
 
@@ -122,4 +120,50 @@ final class AppStore: ObservableObject {
     }
 
     func clearError() { errorMessage = nil }
+
+    // MARK: - Folder access
+
+    func openGameFolder(_ game: GameInfo) async {
+        do {
+            let folder = try await client.getGameFolder(game.appId)
+            if folder.exists {
+                try await client.openInFinder(path: folder.path)
+            } else {
+                errorMessage = "Game folder not found yet. Install the game in Steam first.\nExpected: \(folder.path)"
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func openSteamFolder() async {
+        do {
+            let folder = try await client.getSteamFolder()
+            if folder.exists {
+                try await client.openInFinder(path: folder.path)
+            } else {
+                errorMessage = "steamapps/common not found. Install Steam first."
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func openPrefixFolder() async {
+        do {
+            let folder = try await client.getPrefixFolder()
+            try await client.openInFinder(path: folder.path)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func copyFolderPath(for game: GameInfo) async -> String? {
+        do {
+            let folder = try await client.getGameFolder(game.appId)
+            return folder.path
+        } catch {
+            return nil
+        }
+    }
 }

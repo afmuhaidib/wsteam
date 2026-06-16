@@ -41,6 +41,24 @@ struct LibraryView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
             }
+
+            ToolbarItem {
+                Button {
+                    Task { await store.openSteamFolder() }
+                } label: {
+                    Label("Mods Folder", systemImage: "folder.badge.gearshape")
+                }
+                .help("Open steamapps/common in Finder")
+            }
+
+            ToolbarItem {
+                Button {
+                    Task { await store.openPrefixFolder() }
+                } label: {
+                    Label("Wine Prefix", systemImage: "internaldrive")
+                }
+                .help("Open Wine prefix (drive_c) in Finder")
+            }
         }
         .overlay {
             if store.isLoading {
@@ -89,6 +107,40 @@ struct LibraryView: View {
                     GameCard(game: game)
                         .onTapGesture {
                             Task { await store.launch(game: game) }
+                        }
+                        .contextMenu {
+                            Button {
+                                Task { await store.launch(game: game) }
+                            } label: {
+                                Label("Play", systemImage: "play.fill")
+                            }
+
+                            Divider()
+
+                            Button {
+                                Task { await store.openGameFolder(game) }
+                            } label: {
+                                Label("Open Game Folder in Finder", systemImage: "folder")
+                            }
+
+                            Button {
+                                Task {
+                                    if let path = await store.copyFolderPath(for: game) {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(path, forType: .string)
+                                    }
+                                }
+                            } label: {
+                                Label("Copy Game Folder Path", systemImage: "doc.on.clipboard")
+                            }
+
+                            Divider()
+
+                            Button {
+                                Task { await store.openSteamFolder() }
+                            } label: {
+                                Label("Open steamapps/common", systemImage: "folder.badge.gearshape")
+                            }
                         }
                 }
             }
