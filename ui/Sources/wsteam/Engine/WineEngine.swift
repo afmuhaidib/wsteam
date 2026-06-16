@@ -25,9 +25,26 @@ struct WsteamPaths {
     static let dxvkDir   = base.appendingPathComponent("dxvk")
     static let downloads = base.appendingPathComponent("downloads")
 
+    // Firewall-trusted Wine candidates (CrossOver, Among Us) preferred over our own download
+    private static let trustedWineCandidates: [String] = [
+        "/Users/\(NSUserName())/Applications/Among Us.app/Contents/SharedSupport/wine/bin/wine64",
+        "/Applications/Among Us.app/Contents/SharedSupport/wine/bin/wine64",
+        "/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib/wine/wine64",
+    ]
+
     static var wine64: URL { wineDir.appendingPathComponent("bin/wine64") }
     static var wine32: URL { wineDir.appendingPathComponent("bin/wine") }
-    static var wineBin: URL { fm.fileExists(atPath: wine64.path) ? wine64 : wine32 }
+    // Prefer a firewall-trusted binary so macOS does not block network access
+    static var wineBin: URL {
+        for path in trustedWineCandidates {
+            if fm.fileExists(atPath: path) { return URL(fileURLWithPath: path) }
+        }
+        return fm.fileExists(atPath: wine64.path) ? wine64 : wine32
+    }
+    static var wineServer: URL {
+        let candidate = wineBin.deletingLastPathComponent().appendingPathComponent("wineserver")
+        return fm.fileExists(atPath: candidate.path) ? candidate : wineDir.appendingPathComponent("bin/wineserver")
+    }
     static var steamExe: URL { prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/Steam.exe") }
     static var steamapps: URL { prefix.appendingPathComponent("drive_c/Program Files (x86)/Steam/steamapps/common") }
     static var driveC: URL   { prefix.appendingPathComponent("drive_c") }
@@ -231,7 +248,7 @@ final class WineEngine: ObservableObject {
 
     func killWineserver() {
         let p = Process()
-        p.executableURL = WsteamPaths.wineDir.appendingPathComponent("bin/wineserver")
+        p.executableURL = WsteamPaths.wineServer
         p.arguments = ["-k"]
         p.environment = baseEnv()
         try? p.run()
@@ -255,9 +272,12 @@ final class WineEngine: ObservableObject {
 
     private func baseEnv() -> [String: String] {
         var e = ProcessInfo.processInfo.environment
-        e["WINEPREFIX"] = WsteamPaths.prefix.path
-        e["WINEDEBUG"]  = "-all"
-        e["DXVK_ASYNC"] = "1"
+        e["WINEPREFIX"]  = WsteamPaths.prefix.path
+        e["WINEDEBUG"]   = "-all"
+        e["DXVK_ASYNC"]  = "1"
+        e["WINEMSYNC"]   = "1"   // macOS-native mutex sync (required for network + stability)
+        e["WINEESYNC"]   = "1"   // eventfd sync fallback
+        e["GST_DEBUG"]   = "1"
         return e
     }
 
