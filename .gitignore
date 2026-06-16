@@ -1,0 +1,8 @@
+/target/
+/ui/.build/
+/build/
+*.DS_Store
+~/.wsteam/
+*.exe
+*.tar.xz
+*.tar.gz

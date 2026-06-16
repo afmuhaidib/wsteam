@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    "crates/wsteam-core",
+    "crates/wsteam-daemon",
+    "crates/wsteam-cli",
+]
+resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", features = ["stream", "json"] }
+futures = "0.3"
+dirs = "5"
+sha2 = "0.10"
+hex = "0.4"
+zip = "2"
+indicatif = "0.17"
+clap = { version = "4", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+toml = "0.8"
+bytes = "1"
