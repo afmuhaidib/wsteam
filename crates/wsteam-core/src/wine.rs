@@ -6,8 +6,8 @@ use tracing::{info, warn};
 // gcenx provides Wine bottles that work on macOS Apple Silicon via Rosetta 2
 // We use Wine Crossover build which has best Steam/game compat
 const WINE_CROSSOVER_URL: &str =
-    "https://github.com/Gcenx/macOS_Wine_builds/releases/download/24.0.2/wine-crossover-24.0.2-osx64.tar.xz";
-const WINE_CROSSOVER_VERSION: &str = "24.0.2";
+    "https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.10/wine-staging-11.10-osx64.tar.xz";
+const WINE_CROSSOVER_VERSION: &str = "11.10";
 
 pub struct WineEngine {
     wine_dir: PathBuf,
@@ -71,14 +71,14 @@ impl WineEngine {
         }
 
         // gcenx tarballs extract to "wine-crossover-VERSION" folder — rename to "wine"
-        let extracted_name = format!("wine-crossover-{}", WINE_CROSSOVER_VERSION);
+        let extracted_name = format!("wine-staging-{}", WINE_CROSSOVER_VERSION);
         let extracted = parent.join(&extracted_name);
         if extracted.exists() && extracted != self.wine_dir {
             std::fs::rename(&extracted, &self.wine_dir)?;
         }
 
         // Some builds extract a .app bundle
-        let app_bundle = parent.join(format!("Wine Crossover.app"));
+        let app_bundle = parent.join(format!("Wine Staging.app"));
         if app_bundle.exists() {
             let contents = app_bundle.join("Contents").join("Resources").join("wine");
             if contents.exists() {

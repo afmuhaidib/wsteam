@@ -5,14 +5,14 @@ use std::process::Command;
 use tracing::info;
 
 // DXVK 2.x - translates DX9/10/11 → Vulkan → Metal (via MoltenVK)
-const DXVK_VERSION: &str = "2.5.3";
+const DXVK_VERSION: &str = "1.10.3-20230507";
 const DXVK_URL: &str =
-    "https://github.com/Gcenx/DXVK-macOS/releases/download/v2.5.3/dxvk-macOS-v2.5.3.tar.gz";
+    "https://github.com/Gcenx/DXVK-macOS/releases/download/v1.10.3-20230507-repack/dxvk-macOS-async-v1.10.3-20230507-repack.tar.gz";
 
 // MoltenVK provides Vulkan on Metal
-const MOLTENVK_VERSION: &str = "1.2.11";
+const MOLTENVK_VERSION: &str = "1.4.1";
 const MOLTENVK_URL: &str =
-    "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.11/MoltenVK-macos.tar";
+    "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.1/MoltenVK-macos.tar";
 
 pub struct DxvkManager {
     wine: WineEngine,
@@ -70,7 +70,7 @@ impl DxvkManager {
         }
 
         // Rename extracted dir to "dxvk"
-        let extracted = self.data_dir.join(format!("dxvk-macOS-v{}", DXVK_VERSION));
+        let extracted = self.data_dir.join(format!("dxvk-macOS-async-v1.10.3-20230507-repack"));
         if extracted.exists() {
             if self.dxvk_dir().exists() {
                 std::fs::remove_dir_all(self.dxvk_dir())?;
@@ -121,25 +121,29 @@ impl DxvkManager {
     }
 
     fn setup_moltenvk_icd(&self) -> Result<()> {
-        // MoltenVK tar extracts to MoltenVK/ folder
-        let extracted = self.data_dir.join("MoltenVK");
-
-        // Find the dylib
-        let dylib_path = extracted
+        // Tarball extracts to data_dir/MoltenVK/MoltenVK/dynamic/dylib/macOS/
+        let base = self.data_dir
             .join("MoltenVK")
+            .join("MoltenVK")
+            .join("dynamic")
             .join("dylib")
-            .join("macOS")
-            .join("libMoltenVK.dylib");
+            .join("macOS");
 
-        if !dylib_path.exists() {
-            // Try alternate layout
-            return Ok(());
+        let src_dylib = base.join("libMoltenVK.dylib");
+        let src_icd   = base.join("MoltenVK_icd.json");
+
+        if !src_dylib.exists() {
+            return Ok(()); // extraction not ready yet, skip
         }
 
-        let dest_dylib = self.moltenvk_dir().join("libMoltenVK.dylib");
-        std::fs::copy(&dylib_path, &dest_dylib)?;
+        let dest = self.moltenvk_dir();
+        std::fs::create_dir_all(&dest)?;
+        let dest_dylib = dest.join("libMoltenVK.dylib");
+        let dest_icd   = dest.join("MoltenVK_icd.json");
 
-        // Write ICD JSON
+        std::fs::copy(&src_dylib, &dest_dylib)?;
+
+        // Rewrite ICD to use the absolute dest path so Wine finds it
         let icd_json = serde_json::json!({
             "file_format_version": "1.0.0",
             "ICD": {
@@ -147,9 +151,7 @@ impl DxvkManager {
                 "api_version": "1.3.0"
             }
         });
-
-        let icd_path = self.moltenvk_dir().join("MoltenVK_icd.json");
-        std::fs::write(&icd_path, serde_json::to_string_pretty(&icd_json)?)?;
+        std::fs::write(&dest_icd, serde_json::to_string_pretty(&icd_json)?)?;
 
         Ok(())
     }
@@ -172,8 +174,8 @@ impl DxvkManager {
         std::fs::create_dir_all(&system32)?;
         std::fs::create_dir_all(&syswow64)?;
 
-        let dlls_64 = ["d3d9.dll", "d3d10core.dll", "d3d11.dll", "dxgi.dll"];
-        let dlls_32 = ["d3d9.dll", "d3d10core.dll", "d3d11.dll", "dxgi.dll"];
+        let dlls_64 = ["d3d10core.dll", "d3d11.dll"];
+        let dlls_32 = ["d3d10core.dll", "d3d11.dll"];
 
         // Install x64 DLLs
         for dll in &dlls_64 {
@@ -207,7 +209,7 @@ impl DxvkManager {
             self.wine.wine32_bin()
         };
 
-        let dlls = ["d3d9", "d3d10core", "d3d11", "dxgi"];
+        let dlls = ["d3d10core", "d3d11"];
         for dll in &dlls {
             let key = r"HKEY_CURRENT_USER\Software\Wine\DllOverrides";
             let cmd = format!(r#"reg add "{}" /v "{}" /d "native,builtin" /f"#, key, dll);

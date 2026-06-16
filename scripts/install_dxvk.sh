@@ -6,8 +6,8 @@ DXVK_DIR="$WSTEAM_DIR/dxvk"
 PREFIX="$WSTEAM_DIR/prefix"
 WINE_DIR="$WSTEAM_DIR/wine"
 
-DXVK_VERSION="2.5.3"
-DXVK_URL="https://github.com/Gcenx/DXVK-macOS/releases/download/v${DXVK_VERSION}/dxvk-macOS-v${DXVK_VERSION}.tar.gz"
+DXVK_VERSION="1.10.3-20230507-repack"
+DXVK_URL="https://github.com/Gcenx/DXVK-macOS/releases/download/v1.10.3-20230507-repack/dxvk-macOS-async-v1.10.3-20230507-repack.tar.gz"
 ARCHIVE="$WSTEAM_DIR/dxvk.tar.gz"
 
 mkdir -p "$DXVK_DIR"
@@ -18,7 +18,7 @@ curl -L --progress-bar -o "$ARCHIVE" "$DXVK_URL"
 echo "Extracting..."
 tar -xzf "$ARCHIVE" -C "$WSTEAM_DIR"
 
-EXTRACTED="$WSTEAM_DIR/dxvk-macOS-v${DXVK_VERSION}"
+EXTRACTED="$WSTEAM_DIR/dxvk-macOS-async-v1.10.3-20230507-repack"
 if [ -d "$EXTRACTED" ]; then
     rm -rf "$DXVK_DIR"
     mv "$EXTRACTED" "$DXVK_DIR"

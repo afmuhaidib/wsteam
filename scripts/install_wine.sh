@@ -11,8 +11,8 @@ if [ -f "$WINE_DIR/bin/wine64" ] || [ -f "$WINE_DIR/bin/wine" ]; then
     exit 0
 fi
 
-VERSION="24.0.2"
-URL="https://github.com/Gcenx/macOS_Wine_builds/releases/download/${VERSION}/wine-crossover-${VERSION}-osx64.tar.xz"
+VERSION="11.10"
+URL="https://github.com/Gcenx/macOS_Wine_builds/releases/download/${VERSION}/wine-staging-${VERSION}-osx64.tar.xz"
 ARCHIVE="$WSTEAM_DIR/wine.tar.xz"
 
 echo "Downloading Wine Crossover $VERSION..."
@@ -22,7 +22,7 @@ echo "Extracting..."
 tar -xJf "$ARCHIVE" -C "$WSTEAM_DIR"
 
 # Rename extracted dir
-EXTRACTED="$WSTEAM_DIR/wine-crossover-${VERSION}"
+EXTRACTED="$WSTEAM_DIR/wine-staging-${VERSION}"
 if [ -d "$EXTRACTED" ]; then
     mv "$EXTRACTED" "$WINE_DIR"
 fi
