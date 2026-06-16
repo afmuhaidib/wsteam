@@ -14,7 +14,7 @@ struct WsteamApp: App {
             CommandMenu("wsteam") {
                 Button("Open Steam") { engine.launchSteam() }.keyboardShortcut("s", modifiers: [.command,.shift])
                 Button("Kill Wineserver") { engine.killWineserver() }.keyboardShortcut("k", modifiers: [.command,.option])
-                Button("Open Mods Folder") { engine.openFolder(WsteamPaths.steamapps) }.keyboardShortcut("m", modifiers: [.command,.shift])
+                Button("Open Mods Folder") { engine.openFolder(WsteamPaths.steamapps ?? WsteamPaths.base) }.keyboardShortcut("m", modifiers: [.command,.shift])
             }
         }
     }

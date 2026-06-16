@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject var engine: WineEngine
-    @State private var started = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,10 +17,10 @@ struct SetupView: View {
             Image(systemName: "gamecontroller.fill").font(.title).foregroundStyle(.blue)
             VStack(alignment: .leading, spacing: 2) {
                 Text("wsteam").font(.title2.bold())
-                Text("Windows Steam games on macOS").font(.subheadline).foregroundStyle(.secondary)
+                Text("Windows Steam on macOS via CrossOver").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
-            if engine.wineInstalled && engine.steamInstalled {
+            if engine.steamInstalled {
                 Button("Open Steam") { engine.launchSteam() }.buttonStyle(.borderedProminent)
             }
         }.padding(.horizontal, 24).padding(.vertical, 16)
@@ -29,27 +28,21 @@ struct SetupView: View {
 
     private var content: some View {
         HStack(spacing: 0) {
-            // Left — steps + action
             VStack(alignment: .leading, spacing: 24) {
                 stepsPanel
                 actionArea
                 Spacer()
             }.frame(width: 320).padding(24)
-
             Divider()
-
-            // Right — live log
             logPanel
         }
     }
 
     private var stepsPanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Setup").font(.headline)
-            StepRow(icon: "🍷", label: "Wine Staging 11.10", sub: "Windows compatibility layer", done: engine.wineInstalled)
-            StepRow(icon: "🖥", label: "Windows Prefix", sub: "64-bit Windows 10 environment", done: FileManager.default.fileExists(atPath: WsteamPaths.prefix.appendingPathComponent("system.reg").path))
-            StepRow(icon: "⚡️", label: "DXVK", sub: "DirectX → Metal translation", done: engine.dxvkInstalled)
-            StepRow(icon: "🎮", label: "Steam for Windows", sub: "Log in to install your games", done: engine.steamInstalled)
+            Text("Requirements").font(.headline)
+            StepRow(icon: "🍷", label: "CrossOver", sub: "codeweavers.com — runs Windows apps", done: engine.cxAvailable)
+            StepRow(icon: "🎮", label: "Steam in CrossOver", sub: "Install Steam inside a CrossOver bottle", done: engine.steamInstalled)
         }
         .padding(16)
         .background(.background)
@@ -61,19 +54,23 @@ struct SetupView: View {
         VStack(spacing: 12) {
             if case .error(let msg) = engine.stage {
                 Text(msg).foregroundStyle(.red).font(.caption).multilineTextAlignment(.leading)
-                Button("Try Again") { Task { await engine.runSetup() } }.buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
-            } else if case .downloading(let what) = engine.stage {
-                ProgressView(value: engine.downloadProgress) { Text("Downloading \(what)…").font(.caption) }.progressViewStyle(.linear)
-            } else if isRunning {
+                Button("Check Again") { Task { await engine.runSetup() } }
+                    .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
+            } else if case .checking = engine.stage {
                 ProgressView().controlSize(.small)
-                Text(stageLabel).font(.caption).foregroundStyle(.secondary)
-            } else if engine.wineInstalled && engine.steamInstalled {
-                Button("Open Steam →") { engine.launchSteam() }.buttonStyle(.borderedProminent).frame(maxWidth: .infinity).controlSize(.large)
-                Button("Go to Library") { engine.stage = .ready }.buttonStyle(.bordered).frame(maxWidth: .infinity)
-            } else {
-                Button("Install Everything") { Task { await engine.runSetup() } }
+                Text("Checking…").font(.caption).foregroundStyle(.secondary)
+            } else if engine.steamInstalled {
+                Button("Open Steam →") { engine.launchSteam() }
                     .buttonStyle(.borderedProminent).frame(maxWidth: .infinity).controlSize(.large)
-                Text("Downloads ~400 MB. Keep window open.").font(.caption2).foregroundStyle(.secondary)
+                Button("Go to Library") { engine.stage = .ready }
+                    .buttonStyle(.bordered).frame(maxWidth: .infinity)
+            } else {
+                Button("Check Setup") { Task { await engine.runSetup() } }
+                    .buttonStyle(.borderedProminent).frame(maxWidth: .infinity).controlSize(.large)
+                if !engine.cxAvailable {
+                    Link("Get CrossOver →", destination: URL(string: "https://www.codeweavers.com/crossover")!)
+                        .font(.caption).frame(maxWidth: .infinity)
+                }
             }
         }
     }
@@ -95,22 +92,6 @@ struct SetupView: View {
             .onChange(of: engine.log.count) { _ in
                 if let last = engine.log.last { proxy.scrollTo(last.id, anchor: .bottom) }
             }
-        }
-    }
-
-    private var isRunning: Bool {
-        switch engine.stage {
-        case .extracting, .creatingPrefix, .installingSteam, .downloadingSteam: return true
-        default: return false
-        }
-    }
-    private var stageLabel: String {
-        switch engine.stage {
-        case .extracting:      return "Extracting Wine…"
-        case .creatingPrefix:  return "Creating Windows prefix…"
-        case .downloadingSteam: return "Downloading Steam…"
-        case .installingSteam: return "Installing Steam…"
-        default: return "Working…"
         }
     }
 }

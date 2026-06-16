@@ -29,8 +29,8 @@ struct LibraryView: View {
                 Button { games = engine.scanGames() } label: { Label("Refresh", systemImage: "arrow.clockwise") }.buttonStyle(.plain)
             }
             Section("Folders") {
-                Button { engine.openFolder(WsteamPaths.steamapps) } label: { Label("Games / Mods", systemImage: "folder.badge.gearshape") }.buttonStyle(.plain)
-                Button { engine.openFolder(WsteamPaths.driveC) } label: { Label("Wine C:\\", systemImage: "internaldrive") }.buttonStyle(.plain)
+                Button { engine.openFolder(WsteamPaths.steamapps ?? WsteamPaths.base) } label: { Label("Games / Mods", systemImage: "folder.badge.gearshape") }.buttonStyle(.plain)
+                Button { engine.openFolder(WsteamPaths.cxSteamBottle?.url.appendingPathComponent("drive_c") ?? WsteamPaths.base) } label: { Label("Wine C:\\", systemImage: "internaldrive") }.buttonStyle(.plain)
             }
             Section("System") {
                 Button { engine.stage = .idle } label: { Label("Setup", systemImage: "gearshape") }.buttonStyle(.plain)
